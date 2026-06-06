@@ -1,26 +1,7 @@
-# ============================================================
-# VibeKey — Cloudflare 部署配置
-# ============================================================
+name = "vibe_Key"
+main = "server.js"
+compatibility_date = "2026-06-06"
 
-# 项目名称（确保与 Cloudflare Dashboard 中一致）
-name = "vibekey"
-
-# ── Pages 静态站点配置（推荐：纯静态 HTML，无需 Worker）──
-# 部署命令：npx wrangler pages publish . --project-name=vibekey
-# Pages 优势：无 25MB 限制，自动全球 CDN，免费 SSL
-
-# ── 如果你是 Workers + Assets 模式 ──
-# 注意：Workers 静态资源上限 25MB，本项目照片约 52MB，
-# 建议使用上面的 Pages 方案，或者将图片托管到 R2/CDN 后引用。
-#
-# [assets]
-# directory = "./"
-# not_found_404 = true
-
-# ── 兼容性配置 ──
-compatibility_date = "2025-06-06"
-compatibility_flags = ["nodejs_compat"]
-
-# ── 环境变量（如需）──
-# [vars]
-# SITE_URL = "https://vibekey.pages.dev"
+[assets]
+directory = "./"
+exclude = ["node_modules/**/*"]
