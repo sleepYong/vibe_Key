@@ -1,0 +1,45 @@
+# ============================================================
+# Cloudflare 部署忽略文件（wrangler pages publish / deploy）
+# 这些文件不会被上传到 Cloudflare Workers/Pages
+# ============================================================
+
+# ── Node.js 开发依赖（这是导致 119MB 超标的核心原因）──
+node_modules/
+package.json
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# ── Git 版本控制 ──
+.git/
+.gitignore
+.gitattributes
+
+# ── Claude Code 本地配置 ──
+.claude/
+
+# ── 开发服务器（仅本地用，Cloudflare 不需要）──
+server.js
+
+# ── 编辑器与 OS ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── 临时文件与环境变量 ──
+*.tmp
+*.log
+temp/
+.env
+.env.local
+.env.*.local
+
+# ── 文档（可选，不需要部署到生产环境）──
+docs/prompts/
+README.md

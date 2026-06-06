@@ -26,3 +26,7 @@ temp/
 # Server port config (keep template only)
 .env
 .env.local
+.dev.vars
+
+# Cloudflare Wrangler（本地状态，自动生成，不需提交）
+.wrangler/
