@@ -1,0 +1,28 @@
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# Temp
+*.tmp
+*.log
+temp/
+
+# Claude Code (local config, not for sharing)
+.claude/
+
+# Server port config (keep template only)
+.env
+.env.local

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VibeKey — 为触感而生</title>
+<style>
+  /* ========== RESET & BASE ========== */
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0a0a0a;font-family:'PingFang SC','Noto Serif SC','Georgia','Times New Roman',serif;-webkit-font-smoothing:antialiased}
+
+  /* ========== MAIN STAGE ========== */
+  .stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+
+  /* ========== SCENE LAYER ========== */
+  .scene{position:absolute;inset:0;opacity:0;transition:opacity 1.4s cubic-bezier(.4,0,.2,1);pointer-events:none}
+  .scene.active{opacity:1;z-index:2}
+  .scene.fading{opacity:0;z-index:1;transition:opacity 1.8s cubic-bezier(.4,0,.2,1)}
+
+  /* Ken Burns slow zoom */
+  .scene .img-wrap{position:absolute;inset:-10%;background-size:cover;background-position:center;background-repeat:no-repeat;transform:scale(1);transition:transform 8s cubic-bezier(.25,0,.1,1)}
+  .scene.active .img-wrap{transform:scale(1.08)}
+  .scene.fading .img-wrap{transform:scale(1.12)}
+
+  /* Vignette overlay */
+  .scene .vignette{position:absolute;inset:0;background:radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%)}
+
+  /* ========== TEXT OVERLAY ========== */
+  .text-stage{position:fixed;inset:0;z-index:10;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5vw}
+  .text-line{font-size:clamp(1.4rem,3.5vw,2.8rem);color:#f5f0e8;text-align:center;letter-spacing:.08em;line-height:1.6;text-shadow:0 0 80px rgba(0,0,0,.7),0 0 30px rgba(0,0,0,.5);opacity:0;transform:translateY(24px);transition:opacity 1.2s cubic-bezier(.4,0,.2,1),transform 1.2s cubic-bezier(.4,0,.2,1)}
+  .text-line.visible{opacity:1;transform:translateY(0)}
+  .text-line.fade-out{opacity:0;transform:translateY(-16px);transition:opacity .7s ease-in,transform .7s ease-in}
+  .text-line.title{font-size:clamp(2.2rem,6vw,5rem);font-weight:300;letter-spacing:.15em}
+  .text-line.subtitle{font-size:clamp(1rem,2vw,1.5rem);font-weight:300;letter-spacing:.12em;color:#d4c8b8;margin-top:.6em}
+  .text-line.color-tag{font-size:clamp(.85rem,1.6vw,1.2rem);font-weight:400;letter-spacing:.2em;color:#c4a87c;margin-top:.4em;text-transform:uppercase}
+
+  /* ========== LOGO CORNER ========== */
+  .brand-logo{position:fixed;top:3vw;left:50%;transform:translateX(-50%);z-index:20;pointer-events:none;opacity:0;transition:opacity 1.6s ease}
+  .brand-logo.show{opacity:1}
+  .brand-logo span{font-size:clamp(1rem,1.8vw,1.4rem);letter-spacing:.4em;color:#f5f0e8;text-shadow:0 0 40px rgba(0,0,0,.6);font-weight:300}
+
+  /* ========== PROGRESS BAR ========== */
+  .progress-bar{position:fixed;bottom:0;left:0;height:3px;background:rgba(245,240,232,.35);z-index:30;transition:width .3s linear;pointer-events:none}
+  .progress-track{position:fixed;bottom:0;left:0;width:100%;height:3px;background:rgba(255,255,255,.06);z-index:29;pointer-events:none}
+
+  /* ========== CONTROLS ========== */
+  .controls{position:fixed;bottom:24px;right:24px;z-index:40;display:flex;gap:12px}
+  .controls button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#f5f0e8;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);transition:all .3s}
+  .controls button:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.4)}
+
+  /* ========== LOADING SCREEN ========== */
+  .loading{position:fixed;inset:0;background:#0a0a0a;z-index:100;display:flex;align-items:center;justify-content:center;transition:opacity .8s ease;pointer-events:all}
+  .loading.done{opacity:0;pointer-events:none}
+  .loading .pulse{width:6px;height:6px;border-radius:50%;background:#c4a87c;animation:pulse 1.2s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(196,168,124,.4)}50%{box-shadow:0 0 0 16px rgba(196,168,124,0)}}
+
+  /* ========== AMBIENT PARTICLES ========== */
+  .particles{position:fixed;inset:0;z-index:5;pointer-events:none}
+  .particle{position:absolute;width:2px;height:2px;background:#f5f0e8;border-radius:50%;opacity:0;animation:float-up linear infinite}
+  @keyframes float-up{0%{opacity:0;transform:translateY(100vh) scale(0)}10%{opacity:.6}90%{opacity:.2}100%{opacity:0;transform:translateY(-10vh) scale(1.5)}}
+
+  /* ========== END SCREEN ========== */
+  .end-screen{position:fixed;inset:0;z-index:15;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0a0a;opacity:0;pointer-events:none;transition:opacity 1.6s ease}
+  .end-screen.show{opacity:1}
+  .end-screen .logo-big{font-size:clamp(2.8rem,7vw,6rem);font-weight:200;letter-spacing:.3em;color:#f5f0e8;margin-bottom:.3em}
+  .end-screen .tagline{font-size:clamp(.9rem,1.6vw,1.3rem);letter-spacing:.3em;color:#a09080;font-weight:300}
+  .end-screen .dot{display:inline-block;width:4px;height:4px;border-radius:50%;background:#c4a87c;margin:2em 6px;animation:breathe 2s ease-in-out infinite}
+  @keyframes breathe{0%,100%{opacity:.2;transform:scale(1)}50%{opacity:1;transform:scale(2)}}
+
+  /* ========== RESPONSIVE ========== */
+  @media(max-width:768px){
+    .text-line{font-size:clamp(1.1rem,5vw,1.8rem)}
+    .text-line.title{font-size:clamp(1.6rem,8vw,3rem)}
+    .controls button{width:34px;height:34px;font-size:.85rem}
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div class="loading" id="loading"><div class="pulse"></div></div>
+
+<!-- Brand Logo -->
+<div class="brand-logo" id="brandLogo"><span>VIBEKEY</span></div>
+
+<!-- Particles Layer -->
+<div class="particles" id="particles"></div>
+
+<!-- Image Stage -->
+<div class="stage" id="stage"></div>
+
+<!-- Text Stage -->
+<div class="text-stage" id="textStage"></div>
+
+<!-- End Screen -->
+<div class="end-screen" id="endScreen">
+  <div class="logo-big">VIBEKEY</div>
+  <div class="tagline">为 触 感 而 生</div>
+  <div><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+</div>
+
+<!-- Progress -->
+<div class="progress-track"></div>
+<div class="progress-bar" id="progressBar"></div>
+
+<!-- Controls -->
+<div class="controls">
+  <button id="btnPlay" title="播放 / 暂停">&#9654;</button>
+  <button id="btnReplay" title="重新播放">&#8634;</button>
+</div>
+
+<script>
+// ==================== VIBEKEY CINEMATIC VIDEO ENGINE ====================
+
+const CONFIG = {
+  totalDuration: 65,        // total video length in seconds
+  fadeOverlap: 1.5,        // cross-fade duration
+  autoPlay: true,
+  particleCount: 30,
+};
+
+// Scene definitions — each scene = one image + text sequence
+const SCENES = [
+  {
+    id: 'intro',
+    image: 'VibeKey_photos/vibe_hero_cream.jpg',
+    duration: 5.5,
+    texts: [
+      { time: 0.6,  html: '<div class="text-line title">为触感而生</div>', duration: 3.5 },
+      { time: 1.2,  html: '<div class="text-line subtitle">VibeKey</div>', duration: 3 },
+    ],
+    kenBurns: true,
+  },
+  {
+    id: 'cream',
+    image: 'VibeKey_photos/vibe_hero_cream.jpg',
+    duration: 8,
+    texts: [
+      { time: 0.4,  html: '<div class="text-line color-tag">— 奶油白 —</div>', duration: 6 },
+      { time: 1.2,  html: '<div class="text-line">温柔的开始</div>', duration: 5.5 },
+      { time: 3.5,  html: '<div class="text-line">每一次敲击，都是一种确定</div>', duration: 3.5 },
+      { time: 5,    html: '<div class="text-line">每一次回弹，都是一次呼吸</div>', duration: 2.5 },
+    ],
+  },
+  {
+    id: 'blue',
+    image: 'VibeKey_photos/vibe_blue_morandi.jpg',
+    duration: 7,
+    texts: [
+      { time: 0.3,  html: '<div class="text-line color-tag">— 莫兰迪蓝 —</div>', duration: 5.5 },
+      { time: 1.2,  html: '<div class="text-line">安静的专注</div>', duration: 4.5 },
+      { time: 3.5,  html: '<div class="text-line">PBT 热升华键帽，历久弥新</div>', duration: 3 },
+    ],
+  },
+  {
+    id: 'black',
+    image: 'VibeKey_photos/vibe_hacker_black.jpg',
+    duration: 8,
+    texts: [
+      { time: 0.3,  html: '<div class="text-line color-tag">— 极客黑 —</div>', duration: 6 },
+      { time: 1.2,  html: '<div class="text-line">暗夜中的光芒</div>', duration: 5 },
+      { time: 3.8,  html: '<div class="text-line">每一道流光，都是灵感的信号</div>', duration: 3.5 },
+    ],
+  },
+  {
+    id: 'mint',
+    image: 'VibeKey_photos/vibe_mint_minecraft.jpg',
+    duration: 7,
+    texts: [
+      { time: 0.3,  html: '<div class="text-line color-tag">— 薄荷绿 —</div>', duration: 5.5 },
+      { time: 1.2,  html: '<div class="text-line">自然的呼吸</div>', duration: 4.5 },
+      { time: 3.5,  html: '<div class="text-line">清新的节奏，如沐春风</div>', duration: 3 },
+    ],
+  },
+  {
+    id: 'transparent',
+    image: 'VibeKey_photos/vibe_transparent_limited.jpg',
+    duration: 8,
+    texts: [
+      { time: 0.3,  html: '<div class="text-line color-tag">— 透明限定 —</div>', duration: 6 },
+      { time: 1.2,  html: '<div class="text-line">看见声音的形状</div>', duration: 5 },
+      { time: 4,    html: '<div class="text-line">纯粹，是一种力量</div>', duration: 3.5 },
+    ],
+  },
+  {
+    id: 'lineup',
+    image: 'VibeKey_photos/vibe_lineup_5color.jpg',
+    duration: 10,
+    texts: [
+      { time: 0.4,  html: '<div class="text-line">五种色彩，五种心情</div>', duration: 7 },
+      { time: 2,    html: '<div class="text-line">总有一种，属于你</div>', duration: 6 },
+      { time: 4.5,  html: '<div class="text-line title">VibeKey</div>', duration: 4.5 },
+      { time: 6,    html: '<div class="text-line subtitle">为触感而生</div>', duration: 3.5 },
+    ],
+  },
+];
+
+// ==================== ENGINE STATE ====================
+let scenes = [];           // DOM scene elements
+let activeIndex = -1;
+let sceneTimer = null;
+let textTimers = [];
+let isPlaying = false;
+let startTime = 0;
+let elapsedBeforePause = 0;
+let totalElapsed = 0;
+let rafId = null;
+let particlesSpawned = false;
+
+// ==================== DOM REFS ====================
+const stage = document.getElementById('stage');
+const textStage = document.getElementById('textStage');
+const progressBar = document.getElementById('progressBar');
+const brandLogo = document.getElementById('brandLogo');
+const endScreen = document.getElementById('endScreen');
+const loading = document.getElementById('loading');
+const particlesLayer = document.getElementById('particles');
+const btnPlay = document.getElementById('btnPlay');
+const btnReplay = document.getElementById('btnReplay');
+
+// ==================== BUILD SCENES ====================
+function buildScenes() {
+  SCENES.forEach((def, i) => {
+    const el = document.createElement('div');
+    el.className = 'scene';
+    el.dataset.index = i;
+    el.innerHTML = `
+      <div class="img-wrap" style="background-image:url('${def.image}')"></div>
+      <div class="vignette"></div>
+    `;
+    stage.appendChild(el);
+  });
+  scenes = document.querySelectorAll('.scene');
+}
+
+// ==================== PRELOAD IMAGES ====================
+function preloadImages() {
+  let loaded = 0;
+  const total = SCENES.length;
+  SCENES.forEach(def => {
+    const img = new Image();
+    img.onload = img.onerror = () => {
+      loaded++;
+      if (loaded >= total) {
+        loading.classList.add('done');
+        setTimeout(() => loading.remove(), 900);
+      }
+    };
+    img.src = def.image;
+  });
+}
+
+// ==================== PARTICLES ====================
+function spawnParticle() {
+  const p = document.createElement('div');
+  p.className = 'particle';
+  p.style.left = Math.random() * 100 + '%';
+  p.style.animationDuration = (6 + Math.random() * 10) + 's';
+  p.style.animationDelay = Math.random() * 2 + 's';
+  p.style.width = p.style.height = (1 + Math.random() * 2.5) + 'px';
+  particlesLayer.appendChild(p);
+  p.addEventListener('animationend', () => p.remove());
+}
+
+function startParticles() {
+  if (particlesSpawned) return;
+  particlesSpawned = true;
+  for (let i = 0; i < CONFIG.particleCount; i++) {
+    setTimeout(() => spawnParticle(), i * 300);
+  }
+  setInterval(() => {
+    if (particlesLayer.children.length < CONFIG.particleCount) spawnParticle();
+  }, 2000);
+}
+
+// ==================== TEXT MANAGEMENT ====================
+function clearAllTexts() {
+  textTimers.forEach(t => clearTimeout(t));
+  textTimers = [];
+  textStage.querySelectorAll('.text-line').forEach(el => {
+    el.classList.add('fade-out');
+    setTimeout(() => el.remove(), 700);
+  });
+}
+
+function scheduleTexts(textDefs, sceneStartTime) {
+  textDefs.forEach(def => {
+    const showTimer = setTimeout(() => {
+      const temp = document.createElement('div');
+      temp.innerHTML = def.html;
+      const el = temp.firstChild;
+      textStage.appendChild(el);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => el.classList.add('visible'));
+      });
+
+      // Auto-remove after duration
+      const hideTimer = setTimeout(() => {
+        el.classList.add('fade-out');
+        setTimeout(() => { if (el.parentNode) el.remove(); }, 700);
+      }, def.duration * 1000);
+
+      textTimers.push(hideTimer);
+    }, def.time * 1000);
+
+    textTimers.push(showTimer);
+  });
+}
+
+// ==================== SCENE SWITCHING ====================
+function showScene(index) {
+  if (index === activeIndex) return;
+
+  // Fade out current
+  if (activeIndex >= 0) {
+    scenes[activeIndex].classList.remove('active');
+    scenes[activeIndex].classList.add('fading');
+    setTimeout(() => {
+      scenes[activeIndex].classList.remove('fading');
+    }, 1800);
+  }
+
+  // Fade in new
+  activeIndex = index;
+  scenes[index].classList.add('active');
+  clearAllTexts();
+
+  // Schedule texts
+  scheduleTexts(SCENES[index].texts, totalElapsed);
+
+  // Show/hide brand logo
+  if (index > 0 && index < SCENES.length - 1) {
+    brandLogo.classList.add('show');
+  } else if (index === 0) {
+    setTimeout(() => brandLogo.classList.add('show'), 2000);
+  }
+}
+
+// ==================== PROGRESS ====================
+function updateProgress() {
+  const pct = Math.min((totalElapsed / CONFIG.totalDuration) * 100, 100);
+  progressBar.style.width = pct + '%';
+}
+
+// ==================== MAIN LOOP ====================
+function getSceneAtTime(elapsed) {
+  let acc = 0;
+  for (let i = 0; i < SCENES.length; i++) {
+    const dur = SCENES[i].duration - (i > 0 ? CONFIG.fadeOverlap : 0);
+    if (elapsed < acc + dur) return i;
+    acc += dur;
+  }
+  return SCENES.length - 1;
+}
+
+function getSceneStartTime(index) {
+  let acc = 0;
+  for (let i = 0; i < index; i++) {
+    acc += SCENES[i].duration - (i > 0 ? CONFIG.fadeOverlap : 0);
+  }
+  return acc;
+}
+
+function tick() {
+  if (!isPlaying) return;
+
+  const now = performance.now() / 1000;
+  totalElapsed = elapsedBeforePause + (now - startTime);
+
+  updateProgress();
+
+  const currentSceneIdx = getSceneAtTime(totalElapsed);
+  if (currentSceneIdx !== activeIndex) {
+    showScene(currentSceneIdx);
+  }
+
+  // Check for end
+  if (totalElapsed >= CONFIG.totalDuration) {
+    endVideo();
+    return;
+  }
+
+  rafId = requestAnimationFrame(tick);
+}
+
+// ==================== PLAY / PAUSE / REPLAY ====================
+function play() {
+  if (isPlaying) return;
+  isPlaying = true;
+  btnPlay.innerHTML = '&#10074;&#10074;';
+  startTime = performance.now() / 1000;
+
+  // Show first scene immediately if not started
+  if (activeIndex < 0) {
+    showScene(0);
+    startParticles();
+  }
+
+  rafId = requestAnimationFrame(tick);
+}
+
+function pause() {
+  if (!isPlaying) return;
+  isPlaying = false;
+  btnPlay.innerHTML = '&#9654;';
+  elapsedBeforePause = totalElapsed;
+  if (rafId) cancelAnimationFrame(rafId);
+}
+
+function togglePlay() {
+  if (isPlaying) pause(); else play();
+}
+
+function replay() {
+  pause();
+  totalElapsed = 0;
+  elapsedBeforePause = 0;
+  activeIndex = -1;
+
+  // Reset all scenes
+  scenes.forEach(s => { s.classList.remove('active', 'fading'); });
+  clearAllTexts();
+  brandLogo.classList.remove('show');
+  endScreen.classList.remove('show');
+  progressBar.style.width = '0%';
+
+  // Reset logo
+  brandLogo.classList.remove('show');
+
+  play();
+}
+
+function endVideo() {
+  pause();
+  scenes[activeIndex]?.classList.remove('active');
+  brandLogo.classList.remove('show');
+  endScreen.classList.add('show');
+  btnPlay.innerHTML = '&#9654;';
+  progressBar.style.width = '100%';
+
+  // Keep particles going for the end screen
+}
+
+// ==================== KEYBOARD ====================
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  if (e.code === 'KeyR') replay();
+});
+
+// ==================== BUTTONS ====================
+btnPlay.addEventListener('click', togglePlay);
+btnReplay.addEventListener('click', replay);
+
+// ==================== INIT ====================
+function init() {
+  buildScenes();
+  preloadImages();
+
+  // Auto-play after short delay for images to start loading
+  setTimeout(() => {
+    if (CONFIG.autoPlay) play();
+  }, 600);
+}
+
+init();
+</script>
+</body>
+</html>
